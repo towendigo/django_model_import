@@ -546,6 +546,8 @@ def get_model(self, app_label, model_name=None, require_ready=True):
         As a shortcut, app_label may be in the form <app_label>.<model_name>.
 
         model_name is case-insensitive.
+        ...
+        """
 ```
 This is why we use `<app's name>.<model's name>` in models as string represantations.
 
