@@ -395,3 +395,208 @@ I highly recommend doing everything in a single django project as i did and usin
 
 
 ## Django Model Loaders (django_model_loaders -overkill-):
+
+In Django you can load apps and models with built-in modules. Django itself does that actually.
+
+---
+Model loaders in this case works for Django 3+ (Specifically Django==3.2.7). I did not check for other versions. If you want to do that feel free to contact me. I am planning to do an automated test but not right now.
+
+You should be able to follow this guide as long as you can find the code examples below in your Django distribution. 
+
+---
+
+### How Django Does That :
+
+In Django distribution there is a folder called apps. In that folder there is `config.py` , `registry.py`, `__init__.py` and other files (`__pycache__` folder) related to the apps module.
+
+`__init__.py` file looks like that: 
+
+```python
+from .config import AppConfig
+from .registry import apps
+
+__all__ = ['AppConfig', 'apps']
+```
+
+`config.py` file has a class called `AppConfig` for representing a Django application and it's configurations. 
+
+This class has a method for returning models based on model names.
+
+```python
+# ... (This means there is cods that i do not show because they have nothing to do for what we are looking in this case)
+
+class AppConfig:
+    """Class representing a Django application and its configuration."""
+
+    # ...
+
+    def get_model(self, model_name, require_ready=True):
+        """
+        Return the model with the given case-insensitive model_name.
+
+        Raise LookupError if no model exists with this name.
+        """
+        if require_ready:
+            self.apps.check_models_ready()
+        else:
+            self.apps.check_apps_ready()
+        try:
+            return self.models[model_name.lower()]
+        except KeyError:
+            raise LookupError(
+                "App '%s' doesn't have a '%s' model." % (self.label, model_name))
+
+    # ...
+```
+
+`registry.py` file has a class called `Apps` for storing the configuration of installed applications and keeping track of models, e.g. to provide reverse relations. 
+
+This class has a method for:
+*   Returning apps based on app names 
+*   Returning models based on app names and model names
+*   Returning models based on app names and model names (safer)
+
+```python
+# ...
+
+from .config import AppConfig
+
+class Apps:
+    """
+    A registry that stores the configuration of installed applications.
+
+    It also keeps track of models, e.g. to provide reverse relations.
+    """
+    
+    # ...
+
+    def get_app_config(self, app_label):
+        """
+        Import applications and returns an app config for the given label.
+
+        Raise LookupError if no application exists with this label.
+        """
+        self.check_apps_ready()
+        try:
+            return self.app_configs[app_label]
+        except KeyError:
+            message = "No installed app with label '%s'." % app_label
+            for app_config in self.get_app_configs():
+                if app_config.name == app_label:
+                    message += " Did you mean '%s'?" % app_config.label
+                    break
+            raise LookupError(message)
+
+    # ...
+    
+    def get_model(self, app_label, model_name=None, require_ready=True):
+        """
+        Return the model matching the given app_label and model_name.
+
+        As a shortcut, app_label may be in the form <app_label>.<model_name>.
+
+        model_name is case-insensitive.
+
+        Raise LookupError if no application exists with this label, or no
+        model exists with this name in the application. Raise ValueError if
+        called with a single argument that doesn't contain exactly one dot.
+        """
+        if require_ready:
+            self.check_models_ready()
+        else:
+            self.check_apps_ready()
+
+        if model_name is None:
+            app_label, model_name = app_label.split('.')
+
+        app_config = self.get_app_config(app_label)
+
+        if not require_ready and app_config.models is None:
+            app_config.import_models()
+
+        return app_config.get_model(model_name, require_ready=require_ready)
+
+    # ...
+
+    def get_registered_model(self, app_label, model_name):
+        """
+        Similar to get_model(), but doesn't require that an app exists with
+        the given app_label.
+
+        It's safe to call this method at import time, even while the registry
+        is being populated.
+        """
+        model = self.all_models[app_label].get(model_name.lower())
+        if model is None:
+            raise LookupError(
+                "Model '%s.%s' not registered." % (app_label, model_name))
+        return model
+
+    # ...
+
+apps = Apps(installed_apps=None)
+```
+
+---
+```python
+def get_model(self, app_label, model_name=None, require_ready=True):
+        """
+        Return the model matching the given app_label and model_name.
+
+        As a shortcut, app_label may be in the form <app_label>.<model_name>.
+
+        model_name is case-insensitive.
+```
+This is why we use `<app's name>.<model's name>` in models as string represantations.
+
+---
+
+This is how django does it.
+
+### How We Can Use That :
+
+In a django file like urls, views and models we can import that method and use it directly. Or we can create a model loader module and use that instead. Creating a model loader gives us more flexibility.
+
+#### Direct Use :
+
+Let's use our models. We are going to change user model. But i am not going to add this into repository.
+
+```python
+from django.db import models
+
+# -------------------------------------------------------
+# User has id, name and playlists (User can have many playlists)
+# Every user need a default playlist when created which can contain their musics 
+# -------------------------------------------------------
+
+
+# User 'really need' playlists so let's import Playlists:
+# -------------------------------------------------------
+from playlist.models import Playlist
+# -------------------------------------------------------
+# ... (rest is same)
+
+
+#-#-#-#-#-# as #-#-#-#-#-#
+
+
+from django.db import models
+
+# from django.apps import apps class as AppLoader and then use get_model method
+# -------------------------------------------------------
+from django.apps import apps as AppLoader
+# -------------------------------------------------------
+
+# -------------------------------------------------------
+# User has id, name and playlists (User can have many playlists)
+# Every user need a default playlist when created which can contain their musics 
+# -------------------------------------------------------
+
+
+# User 'really need' playlists so let's get it with get_model instead of importing:
+# -------------------------------------------------------
+Playlist = AppLoader.get_model(app_label="playlist.Playlist", require_ready=False)
+# -------------------------------------------------------
+# ... (rest is same)
+```
+
