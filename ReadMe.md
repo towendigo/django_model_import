@@ -600,3 +600,82 @@ Playlist = AppLoader.get_model(app_label="playlist.Playlist", require_ready=Fals
 # ... (rest is same)
 ```
 
+#### Indirect Use :
+
+In django_music_app/django_music_app folder create a file called `model_loader.py`.
+
+`model_loader.py` : 
+```python
+from django.apps import apps as AppLoader
+
+def Single_Loader(app_name, model_name = False, strict= False):
+    try :
+        return AppLoader.get_model(app_name, model_name, strict)
+    except :
+        return None
+        # You can do something if there is an error
+
+
+def Multi_Loader(app_name, model_names : list, strict= False):
+    try : 
+        return_models = []   # You can pass model names as list and get a model object list 
+        for model_name in model_names:
+            return_models.append(AppLoader.get_model(app_name, model_name, strict))
+        return return_models
+    except :
+        return None
+```
+
+Etc...
+
+You can import this methods like:
+
+```python
+from project_name.model_loader import Multi_Loader
+``` 
+
+Let's use our models. We are going to change user model. But i am not going to add this into repository.
+
+```python
+from django.db import models
+
+# Import custom model loaders
+from django_music_app.model_loader import Single_Loader
+
+# -------------------------------------------------------
+# User has id, name and playlists (User can have many playlists)
+# Every user need a default playlist when created which can contain their musics 
+# -------------------------------------------------------
+
+
+# User 'really need' playlists so let's use custom model loader for Playlists:
+# -------------------------------------------------------
+Playlist = Single_Loader(app_name='playlist', model_name = 'Playlist', strict= False)
+# -------------------------------------------------------
+# ... (rest is same)
+```
+
+Instead of `apps.get_model()` you can load models like this if needed:
+
+```python
+from django.apps import apps as AppLoader
+
+def Single_Loader(app_name, model_name, err_code=False):
+    try:
+        App = AppLoader.get_app_config(app_name) 
+        # get app first 
+        
+        return App.get_model(model_name) 
+        # get model with app.get_model(model_name) instead of apps.get_model(app_name, model_name)
+
+        # This can be beneficial if you need more than one model 
+        # from same app since this method loads app once and use 
+        # it as many times as you want
+    except:
+        return None
+```
+
+
+## END
+
+Author : Akif Sahin Korkmaz
