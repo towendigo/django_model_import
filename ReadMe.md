@@ -349,11 +349,11 @@ It should be successful now. We solved recursive import problem with using strin
 
 ### Making Models Human Readable :
 
-In Django, models have a method named `__str__`. This method returns a nick-name for model thus make it human readable.
+In Django, models have a method named `__str__`. This method returns a nick-name for model (in django admin) thus make it human readable.
 
 I am going to add user and playlist models (class) this code (method) :
 ```python
-    # ------ nicname model -------- 
+    # ------ nick-name model -------- 
     def __str__(self) -> str :
         return '%s' %self.name
     # ----------------------------- 
@@ -362,7 +362,7 @@ I am going to add user and playlist models (class) this code (method) :
 And add music model (class) this code (method) :
 
 ```python
-    # ------ nicname model -------- 
+    # ------ nick-name model -------- 
     def __str__(self) -> str:
         return '%s by %s' %(self.name, " and ".join(self.artists.name) )
     # ----------------------------- 
